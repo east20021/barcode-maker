@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>탈락 바코드 생성기</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1e27; --line:#2a3040; --fg:#e8ecf4; --mut:#8a93a6; --ac:#4ea1ff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,"맑은 고딕",system-ui,sans-serif; }
+  header { padding:14px 16px; font-weight:700; font-size:17px; border-bottom:1px solid var(--line); }
+  header small { display:block; color:var(--mut); font-weight:400; font-size:12px; margin-top:2px; }
+  .wrap { padding:16px; max-width:520px; margin:0 auto; }
+  button { font:inherit; border:0; border-radius:12px; padding:14px 16px; width:100%; font-weight:700;
+           background:var(--ac); color:#031024; margin-top:10px; }
+  button.sub { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
+  .camwrap { position:relative; width:100%; border-radius:14px; overflow:hidden; background:#000; aspect-ratio:3/4; }
+  video { width:100%; height:100%; object-fit:cover; display:block; }
+  .guide { position:absolute; left:10%; right:10%; top:38%; height:24%; border:2px solid var(--ac);
+           border-radius:10px; box-shadow:0 0 0 2000px rgba(0,0,0,.35); }
+  .guide span { position:absolute; top:-22px; left:0; font-size:12px; color:var(--ac); }
+  .status { color:var(--mut); font-size:13px; min-height:18px; margin:10px 2px; text-align:center; }
+  .row { display:flex; gap:8px; align-items:center; margin:10px 0; }
+  .row label { color:var(--mut); font-size:13px; }
+  input[type=text], input[type=number] { background:var(--card); border:1px solid var(--line); color:var(--fg);
+           border-radius:10px; padding:10px; font-size:16px; width:100%; }
+  .num { font-size:26px; font-weight:800; letter-spacing:1px; text-align:center; }
+  .codes { background:#fff; border-radius:14px; padding:18px; text-align:center; margin-top:12px; }
+  .codes h4 { color:#333; margin:4px 0 8px; font-size:13px; }
+  #qr { margin:0 auto 14px; }
+  #barcode { max-width:100%; }
+  .hide { display:none !important; }
+  .toggle { display:flex; gap:6px; }
+  .toggle button { margin:0; padding:8px; font-size:13px; }
+  .toggle button.off { background:var(--card); color:var(--mut); border:1px solid var(--line); }
+  .err { color:#ff6b6b; }
+</style>
+</head>
+<body>
+<header>📷 탈락 바코드 생성기 <small>PDA 번호를 비추면 → QR + 바코드 자동 생성 (인식은 폰 안에서, 외부 전송 없음)</small></header>
+<div class="wrap">
+
+  <!-- 설정 -->
+  <div class="row">
+    <label>인식 모드</label>
+    <div class="toggle" style="flex:1">
+      <button id="mNum" onclick="setMode('num')">숫자만</button>
+      <button id="mAlnum" class="off" onclick="setMode('alnum')">영문+숫자</button>
+    </div>
+  </div>
+  <div class="row">
+    <label>최소 길이</label>
+    <input type="number" id="minLen" value="4" min="1" style="width:80px">
+    <label style="flex:1">자 이상인 가장 긴 덩어리를 잡아요</label>
+  </div>
+
+  <!-- 카메라 -->
+  <div id="camwrap" class="camwrap hide">
+    <video id="video" playsinline muted></video>
+    <div class="guide"><span>이 박스 안에 번호를 맞춰요</span></div>
+  </div>
+
+  <button id="startBtn" onclick="startCam()">카메라 시작</button>
+  <button id="scanBtn" class="hide" onclick="scanOnce()">스캔 (탭)</button>
+  <div class="row hide" id="autoRow">
+    <label style="flex:1">자동 인식 (비추면 알아서)</label>
+    <div class="toggle"><button id="autoOn" class="off" onclick="toggleAuto()">꺼짐</button></div>
+  </div>
+
+  <!-- 사진 찍기(로컬 파일 대비) -->
+  <label class="sub" style="display:block;text-align:center;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px;color:var(--mut)">
+    또는 사진 찍어서 인식
+    <input type="file" accept="image/*" capture="environment" style="display:none" onchange="scanFile(this.files[0])">
+  </label>
+
+  <div class="status" id="status"></div>
+
+  <!-- 결과 -->
+  <div id="result" class="hide">
+    <input type="text" id="numIn" class="num" oninput="makeCodes(this.value.trim())" placeholder="인식된 번호">
+    <div class="codes">
+      <h4>QR 코드</h4>
+      <canvas id="qr"></canvas>
+      <h4>바코드 (CODE128)</h4>
+      <svg id="barcode"></svg>
+    </div>
+    <button class="sub" onclick="copyNum()">번호 복사</button>
+    <button class="sub" onclick="reset()">다시 스캔</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+let worker=null, stream=null, mode='num', autoTimer=null, lastSeen='';
+const $=id=>document.getElementById(id);
+const setStatus=(t,err)=>{ const s=$('status'); s.textContent=t; s.className='status'+(err?' err':''); };
+
+function setMode(m){ mode=m;
+  $('mNum').className = m==='num'?'':'off';
+  $('mAlnum').className = m==='alnum'?'':'off';
+  if(worker) worker.setParameters({ tessedit_char_whitelist: charset() });
+}
+const charset=()=> mode==='num' ? '0123456789' : '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+// OCR 엔진 준비 (최초 1회, 인터넷 필요 — 이후 캐시)
+async function ensureWorker(){
+  if(worker) return;
+  setStatus('인식 엔진 불러오는 중… (최초 1회, 인터넷 필요)');
+  worker = await Tesseract.createWorker('eng');
+  await worker.setParameters({ tessedit_char_whitelist: charset() });
+  setStatus('');
+}
+
+// 카메라 시작 (HTTPS에서만 동작)
+async function startCam(){
+  try{
+    await ensureWorker();
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    $('video').srcObject = stream; await $('video').play();
+    $('camwrap').classList.remove('hide');
+    $('startBtn').classList.add('hide');
+    $('scanBtn').classList.remove('hide');
+    $('autoRow').classList.remove('hide');
+  }catch(e){
+    setStatus('카메라를 못 열었어요. HTTPS 주소가 아니면 라이브 카메라가 막혀요 → 아래 "사진 찍어서 인식"을 쓰세요.', true);
+  }
+}
+
+// 현재 영상에서 가이드 박스 영역만 잘라 캔버스로
+function grabFrame(){
+  const v=$('video'), vw=v.videoWidth, vh=v.videoHeight;
+  const bx=0.10*vw, bw=0.80*vw, by=0.38*vh, bh=0.24*vh;      // 가이드 박스와 동일 비율
+  const sc=2;                                                 // 작은 글자 대비 2배 확대
+  const c=document.createElement('canvas'); c.width=bw*sc; c.height=bh*sc;
+  c.getContext('2d').drawImage(v, bx,by,bw,bh, 0,0, c.width,c.height);
+  return c;
+}
+
+async function scanOnce(){
+  if(!worker) return;
+  setStatus('인식 중…');
+  const { data } = await worker.recognize(grabFrame());
+  handleText(data.text);
+}
+
+// 자동 인식: 1.5초마다, 같은 값 2번 연속이면 확정
+function toggleAuto(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; $('autoOn').textContent='꺼짐'; $('autoOn').className='off'; return; }
+  $('autoOn').textContent='켜짐'; $('autoOn').className=''; lastSeen='';
+  autoTimer=setInterval(async()=>{
+    if(!worker) return;
+    const { data } = await worker.recognize(grabFrame());
+    const hit=pick(data.text);
+    setStatus(hit?('보임: '+hit):'번호를 찾는 중…');
+    if(hit && hit===lastSeen){ clearInterval(autoTimer); autoTimer=null; $('autoOn').textContent='꺼짐'; $('autoOn').className='off'; show(hit); }
+    lastSeen=hit;
+  }, 1500);
+}
+
+// 사진 파일 인식 (호스팅 없이도 됨)
+async function scanFile(file){
+  if(!file) return;
+  await ensureWorker();
+  setStatus('사진 인식 중…');
+  const url=URL.createObjectURL(file);
+  const { data } = await worker.recognize(url);
+  URL.revokeObjectURL(url);
+  handleText(data.text);
+}
+
+// 텍스트에서 번호 추출 규칙: 최소 길이 이상 "가장 긴 덩어리"
+function pick(text){
+  const min=Math.max(1, parseInt($('minLen').value)||1);
+  const re = mode==='num' ? /[0-9]+/g : /[0-9A-Za-z]+/g;
+  const toks=(text.toUpperCase().match(re)||[]).filter(t=>t.length>=min);
+  if(!toks.length) return '';
+  return toks.sort((a,b)=>b.length-a.length)[0];
+}
+function handleText(text){
+  const hit=pick(text);
+  if(hit){ show(hit); } else { setStatus('번호를 못 찾았어요. 박스에 번호만 크게 맞춰 다시 스캔하세요.', true); }
+}
+function show(v){ setStatus(''); $('result').classList.remove('hide'); $('numIn').value=v; makeCodes(v); }
+
+function makeCodes(v){
+  if(!v){ return; }
+  QRCode.toCanvas($('qr'), v, { width:200, margin:1 }, ()=>{});
+  try{ JsBarcode('#barcode', v, { format:'CODE128', displayValue:true, height:70, fontSize:16, margin:4 }); }
+  catch(e){ /* CODE128은 사실상 모든 문자 허용 */ }
+}
+function copyNum(){ const v=$('numIn').value.trim(); navigator.clipboard?.writeText(v); setStatus('복사됨: '+v); }
+function reset(){ $('result').classList.add('hide'); lastSeen=''; setStatus(''); }
+</script>
+</body>
+</html>
