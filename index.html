@@ -40,7 +40,7 @@
 </style>
 </head>
 <body>
-<header>📷 탈락 바코드 생성기 <small>v2 · PDA 번호 비추면 QR+바코드 생성 (인식은 폰 안에서)</small></header>
+<header>📷 탈락 바코드 생성기 <small>v3 · PDA 번호 비추면 QR+바코드 생성 (인식은 폰 안에서)</small></header>
 <div class="wrap">
 
   <!-- 엔진(OCR) 상태 -->
@@ -85,7 +85,7 @@
     <input type="text" id="numIn" class="num" oninput="makeCodes(this.value.trim())" placeholder="인식된 번호">
     <div class="codes">
       <h4>QR 코드</h4>
-      <canvas id="qr"></canvas>
+      <div id="qr" style="display:inline-block"></div>
       <h4>바코드 (CODE128)</h4>
       <svg id="barcode"></svg>
     </div>
@@ -96,7 +96,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
 <script>
 let worker=null, engineReady=false, stream=null, mode='alnum', autoTimer=null, lastSeen='';
 const $=id=>document.getElementById(id);
@@ -211,7 +211,8 @@ function show(v){ setStatus('인식됨: '+v); $('result').classList.remove('hide
 
 function makeCodes(v){
   if(!v) return;
-  if(typeof QRCode!=='undefined') QRCode.toCanvas($('qr'), v, { width:200, margin:1 }, ()=>{});
+  const qd=$('qr'); qd.innerHTML='';
+  if(typeof QRCode!=='undefined'){ try{ new QRCode(qd, { text:v, width:200, height:200, correctLevel:QRCode.CorrectLevel.M }); }catch(e){} }
   if(typeof JsBarcode!=='undefined'){ try{ JsBarcode('#barcode', v, { format:'CODE128', displayValue:true, height:70, fontSize:16, margin:4 }); }catch(e){} }
 }
 function copyNum(){ const v=$('numIn').value.trim(); if(navigator.clipboard) navigator.clipboard.writeText(v); setStatus('복사됨: '+v); }
