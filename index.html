@@ -76,7 +76,7 @@
 </head>
 <body>
 <header>
-  <b>📷 탈락 바코드</b><span class="v">v9</span>
+  <b>📷 탈락 바코드</b><span class="v">v6</span>
   <span id="dot" class="dot" title="인식 엔진"></span>
 </header>
 
@@ -169,8 +169,7 @@ async function initEngine(){
 
 async function startCam(){
   try{
-    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment',
-      width:{ ideal:1920 }, height:{ ideal:1080 } } });
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
     $('video').srcObject=stream; await $('video').play(); camOn=true;
     $('startBtn').classList.add('hide'); $('scanBtn').classList.remove('hide');
     setStatus(engineReady?'번호를 네모 안에 맞추고 스캔':'엔진 준비 중… 잠시만', engineReady?'ok':'');
