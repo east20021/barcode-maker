@@ -76,7 +76,7 @@
 </head>
 <body>
 <header>
-  <b>📷 탈락 바코드</b><span class="v">v5</span>
+  <b>📷 탈락 바코드</b><span class="v">v10</span>
   <span id="dot" class="dot" title="인식 엔진"></span>
 </header>
 
@@ -162,7 +162,7 @@ async function initEngine(){
     worker = await Tesseract.createWorker('eng', 1, {
       logger:m=>{ if(m.progress!=null && !engineReady) setStatus('인식 엔진 준비 중… '+Math.round(m.progress*100)+'%'); }
     });
-    await worker.setParameters({ tessedit_char_whitelist: charset() });
+    await worker.setParameters({ tessedit_char_whitelist: charset(), tessedit_pageseg_mode: '7' });
     engineReady=true; setDot('ok'); setStatus(camOn?'번호를 네모 안에 맞추고 스캔':'카메라를 켜주세요','ok');
   }catch(e){ setDot('err'); setStatus('엔진 로드 실패: '+(e&&e.message?e.message:e),'err'); }
 }
@@ -179,7 +179,7 @@ function camTap(){ if(camOn && !autoTimer) scanOnce(); }
 
 function grabFrame(){
   const v=$('video'), vw=v.videoWidth, vh=v.videoHeight; if(!vw||!vh) return null;
-  const bx=.07*vw, bw=.86*vw, by=.37*vh, bh=.26*vh, sc=2;
+  const bx=.07*vw, bw=.86*vw, by=.37*vh, bh=.26*vh, sc=3;
   const c=document.createElement('canvas'); c.width=bw*sc; c.height=bh*sc;
   c.getContext('2d').drawImage(v, bx,by,bw,bh, 0,0, c.width,c.height); return c;
 }
