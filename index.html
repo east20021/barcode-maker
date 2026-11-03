@@ -5,249 +5,142 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f1115">
-<title>탈락 바코드 생성기</title>
+<title>코드 → QR/바코드</title>
 <style>
   :root{ --bg:#0f1115; --card:#1a1e27; --line:#2a3040; --fg:#e8ecf4; --mut:#8a93a6; --ac:#4ea1ff; --ok:#5bd98a; --err:#ff6b6b; }
-  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
-  html,body{ height:100%; }
-  body{ margin:0; background:var(--bg); color:var(--fg);
-        font-family:-apple-system,"맑은 고딕",system-ui,sans-serif;
-        display:flex; flex-direction:column;
-        padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  header{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); flex:none; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,"맑은 고딕",system-ui,sans-serif;
+        padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header{ display:flex; align-items:center; gap:8px; padding:13px 16px; border-bottom:1px solid var(--line); }
   header b{ font-size:16px; } header .v{ color:var(--mut); font-size:11px; }
-  .dot{ width:9px; height:9px; border-radius:50%; background:var(--mut); margin-left:auto; flex:none; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--mut); margin-left:auto; }
   .dot.ok{ background:var(--ok); box-shadow:0 0 8px var(--ok); } .dot.err{ background:var(--err); }
-  main{ flex:1; min-height:0; display:flex; flex-direction:column; padding:14px; gap:12px; overflow:auto; }
-  .grow{ flex:1; min-height:0; display:flex; flex-direction:column; gap:12px; }
-
-  /* 버튼 */
+  .wrap{ max-width:520px; margin:0 auto; padding:16px; }
+  label.cap{ display:block; color:var(--mut); font-size:13px; margin:2px 2px 6px; }
+  #code{ width:100%; font-size:26px; font-weight:800; letter-spacing:1px; text-align:center; text-transform:uppercase;
+         background:var(--card); border:2px solid var(--ac); color:var(--fg); border-radius:14px; padding:16px 10px; }
+  #code::placeholder{ color:#5a6273; font-weight:500; letter-spacing:0; text-transform:none; font-size:17px; }
   button{ font:inherit; border:0; border-radius:14px; font-weight:800; background:var(--ac); color:#031024;
-          padding:17px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; }
+          padding:16px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px; }
   button:active{ transform:scale(.98); }
   button.sub{ background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:600; }
-  .pair{ display:flex; gap:10px; } .pair button{ flex:1; }
-
-  /* 카메라 */
-  .cam{ position:relative; flex:1; min-height:180px; border-radius:18px; overflow:hidden; background:#000; }
-  video{ width:100%; height:100%; object-fit:cover; display:block; }
-  .box{ position:absolute; left:7%; right:7%; top:50%; transform:translateY(-50%); height:26%;
-        box-shadow:0 0 0 2000px rgba(0,0,0,.42); border-radius:12px; }
-  .box i{ position:absolute; width:22px; height:22px; border:3px solid var(--ac); }
-  .box i:nth-child(1){ top:-2px; left:-2px; border-right:0; border-bottom:0; border-radius:12px 0 0 0; }
-  .box i:nth-child(2){ top:-2px; right:-2px; border-left:0; border-bottom:0; border-radius:0 12px 0 0; }
-  .box i:nth-child(3){ bottom:-2px; left:-2px; border-right:0; border-top:0; border-radius:0 0 0 12px; }
-  .box i:nth-child(4){ bottom:-2px; right:-2px; border-left:0; border-top:0; border-radius:0 0 12px 0; }
-  .hint{ position:absolute; left:0; right:0; top:calc(50% - 26% - 30px); text-align:center; color:#cfe4ff; font-size:13px; }
-  .taphint{ position:absolute; left:0; right:0; bottom:12px; text-align:center; color:#9fb4cc; font-size:12px; }
-
-  .status{ color:var(--mut); font-size:13px; text-align:center; min-height:18px; }
-  .status.err{ color:var(--err); } .status.ok{ color:var(--ok); }
-
-  .mini{ display:flex; gap:10px; }
-  .mini button{ padding:12px; font-size:13px; font-weight:600; }
-  .toggle{ display:flex; align-items:center; gap:8px; }
-  .sw{ width:46px; height:28px; border-radius:20px; background:var(--line); position:relative; flex:none; transition:.15s; }
-  .sw.on{ background:var(--ac); } .sw b{ position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:.15s; }
-  .sw.on b{ left:21px; }
-
-  /* 설정 */
-  details{ background:var(--card); border:1px solid var(--line); border-radius:12px; }
-  summary{ padding:12px 14px; font-size:13px; color:var(--mut); list-style:none; }
-  summary::-webkit-details-marker{ display:none; }
-  .setbody{ padding:0 14px 14px; display:flex; flex-direction:column; gap:12px; }
-  .seg{ display:flex; gap:6px; } .seg button{ padding:10px; font-size:13px; }
-  .seg button.off{ background:var(--bg); color:var(--mut); border:1px solid var(--line); }
-  .fld{ display:flex; align-items:center; gap:10px; color:var(--mut); font-size:13px; }
-  .fld input{ width:72px; background:var(--bg); border:1px solid var(--line); color:var(--fg); border-radius:10px; padding:9px; font-size:16px; }
+  .pair{ display:flex; gap:10px; } .pair>*{ flex:1; }
 
   /* 결과 */
-  .card{ background:#fff; border-radius:18px; padding:16px; text-align:center; }
-  .card .lbl{ color:#8a8f98; font-size:12px; margin:2px 0 8px; }
+  .result{ background:#fff; border-radius:16px; padding:18px; text-align:center; margin-top:16px; }
+  .result h4{ color:#555; font-size:12px; margin:2px 0 8px; font-weight:700; }
   #barcode{ max-width:100%; }
-  #num{ width:100%; text-align:center; font-size:30px; font-weight:900; letter-spacing:1px; color:#111;
-        border:2px dashed #cfd4dd; border-radius:12px; padding:12px 8px; margin:4px 0 2px; background:#fafbfc;
-        -webkit-user-select:text; user-select:text; }
-  .edithint{ color:#b03; font-size:11.5px; margin-bottom:12px; }
-  #qr{ display:inline-block; margin-top:4px; }
-  footer{ text-align:center; color:#5d6676; font-size:12px; padding:6px 0 10px; flex:none; letter-spacing:.3px; }
+  #qr{ display:inline-block; margin-bottom:6px; }
+  .empty{ color:var(--mut); text-align:center; margin-top:28px; font-size:14px; line-height:1.6; }
+
+  /* 카메라 오버레이 */
+  .cam{ position:fixed; inset:0; background:#000; z-index:9; display:none; flex-direction:column; }
+  .cam.on{ display:flex; }
+  .cam video{ flex:1; width:100%; object-fit:cover; }
+  .cam .box{ position:absolute; left:8%; right:8%; top:44%; height:12%; border:2px solid var(--ac); border-radius:10px;
+             box-shadow:0 0 0 2000px rgba(0,0,0,.45); }
+  .cam .bar{ padding:14px 16px calc(14px + env(safe-area-inset-bottom)); background:#000; }
+  .cam .msg{ color:#cfe4ff; text-align:center; font-size:14px; min-height:20px; margin-bottom:8px; }
   .hide{ display:none !important; }
 </style>
 </head>
 <body>
-<header>
-  <b>📷 탈락 바코드</b><span class="v">v10</span>
-  <span id="dot" class="dot" title="인식 엔진"></span>
-</header>
+<header><b>📷 코드 → QR/바코드</b><span class="v">v11</span><span id="dot" class="dot"></span></header>
 
-<main>
-  <!-- ================= 스캔 화면 ================= -->
-  <div id="scanView" class="grow">
-    <div class="cam" id="cam" onclick="camTap()">
-      <video id="video" playsinline muted></video>
-      <div class="hint" id="hint">번호를 네모 안에 맞추세요</div>
-      <div class="box"><i></i><i></i><i></i><i></i></div>
-      <div class="taphint" id="taphint">화면을 탭하면 스캔</div>
-    </div>
+<div class="wrap">
+  <label class="cap">번호 (직접 입력 또는 카메라 스캔) — 입력하면 아래 코드가 바로 생성돼요</label>
+  <input id="code" type="text" placeholder="예: 78-RCRT9-1-101" autocomplete="off" oninput="render()">
 
-    <div class="status" id="status">카메라를 켜주세요</div>
+  <button onclick="openCam()">📷  카메라로 스캔</button>
 
-    <button id="startBtn" onclick="startCam()">▶  카메라 시작</button>
-    <button id="scanBtn" class="hide" onclick="scanOnce()">📷  스캔</button>
-
-    <div class="mini">
-      <button class="sub" onclick="document.getElementById('file').click()">🖼 사진으로</button>
-      <button class="sub toggle" onclick="toggleAuto()" style="justify-content:center">
-        <span>자동</span><span class="sw" id="sw"><b></b></span>
-      </button>
-    </div>
-    <input type="file" id="file" accept="image/*" capture="environment" class="hide" onchange="scanFile(this.files[0])">
-
-    <details>
-      <summary>⚙️ 설정 (모드·자릿수)</summary>
-      <div class="setbody">
-        <div>
-          <div class="fld" style="margin-bottom:8px">인식 모드</div>
-          <div class="seg">
-            <button id="mAlnum" onclick="setMode('alnum')">영문+숫자</button>
-            <button id="mNum" class="off" onclick="setMode('num')">숫자만</button>
-          </div>
-        </div>
-        <div class="fld">최소 길이 <input type="number" id="minLen" value="4" min="1"> 자 이상</div>
-      </div>
-    </details>
+  <div id="out"></div>
+  <div class="pair" id="acts" style="display:none">
+    <button class="sub" onclick="copyCode()">📋 번호 복사</button>
+    <button class="sub" onclick="clearCode()">✕ 지우기</button>
   </div>
 
-  <!-- ================= 결과 화면 ================= -->
-  <div id="resultView" class="grow hide">
-    <div class="card">
-      <div class="lbl">바코드 (스캐너로 이걸 찍으세요)</div>
-      <svg id="barcode"></svg>
-      <input id="num" type="text" oninput="makeCodes(this.value.trim())" placeholder="번호">
-      <div class="edithint">⚠️ 하이픈(-)이나 글자가 틀리면 위 칸을 눌러 고치세요 → 코드 자동 갱신</div>
-      <div class="lbl">QR 코드</div>
-      <div id="qr"></div>
-    </div>
-    <div style="flex:1"></div>
+  <div class="empty" id="empty">위 칸에 번호를 입력하거나<br>📷 카메라로 스캔하면<br>QR·바코드가 여기 나와요</div>
+</div>
+
+<!-- 카메라 오버레이 -->
+<div class="cam" id="cam">
+  <video id="video" playsinline muted></video>
+  <div class="box"></div>
+  <div class="bar">
+    <div class="msg" id="msg">번호를 네모 안에 맞추세요</div>
     <div class="pair">
-      <button class="sub" onclick="copyNum()">📋 복사</button>
-      <button onclick="reset()">🔄 다시 스캔</button>
+      <button onclick="scanOnce()">스캔</button>
+      <button class="sub" onclick="closeCam()">닫기</button>
     </div>
   </div>
-</main>
-
-<footer>made by Smith 🛠️</footer>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
 <script>
-let worker=null, engineReady=false, stream=null, mode='alnum', autoTimer=null, lastSeen='', camOn=false;
 const $=id=>document.getElementById(id);
-const setStatus=(t,c)=>{ const s=$('status'); s.textContent=t||''; s.className='status'+(c?(' '+c):''); };
-const setDot=c=>{ $('dot').className='dot'+(c?(' '+c):''); };
+let worker=null, ready=false, stream=null;
 
-function setMode(m){ mode=m;
-  $('mAlnum').className = m==='alnum'?'':'off';
-  $('mNum').className = m==='num'?'':'off';
-  if(worker) worker.setParameters({ tessedit_char_whitelist: charset() });
+// ---------- 코드 생성 (입력 즉시) ----------
+function render(){
+  const v=$('code').value.trim().toUpperCase();
+  const out=$('out'), acts=$('acts'), empty=$('empty');
+  if(!v){ out.innerHTML=''; acts.style.display='none'; empty.style.display='block'; return; }
+  empty.style.display='none'; acts.style.display='flex';
+  out.innerHTML='<div class="result"><h4>바코드 (CODE128)</h4><svg id="barcode"></svg>'
+              + '<h4 style="margin-top:14px">QR 코드</h4><div id="qr"></div></div>';
+  if(typeof JsBarcode!=='undefined'){ try{ JsBarcode('#barcode', v, {format:'CODE128',displayValue:true,height:90,fontSize:18,margin:6,width:2.2}); }catch(e){} }
+  if(typeof QRCode!=='undefined'){ try{ new QRCode($('qr'), {text:v, width:180, height:180, correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
 }
-const charset=()=> mode==='num' ? '0123456789' : '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-';
+function copyCode(){ const v=$('code').value.trim(); if(navigator.clipboard) navigator.clipboard.writeText(v); }
+function clearCode(){ $('code').value=''; render(); $('code').focus(); }
 
+// ---------- OCR 엔진 (최초 1회 로딩) ----------
 window.addEventListener('load', initEngine);
 async function initEngine(){
-  if(typeof Tesseract==='undefined'){ setStatus('인식 라이브러리 로드 실패 (인터넷 확인 후 새로고침)','err'); setDot('err'); return; }
+  if(typeof Tesseract==='undefined'){ $('dot').className='dot err'; return; }
   try{
-    setDot(''); setStatus('인식 엔진 준비 중… (최초 1회)');
-    worker = await Tesseract.createWorker('eng', 1, {
-      logger:m=>{ if(m.progress!=null && !engineReady) setStatus('인식 엔진 준비 중… '+Math.round(m.progress*100)+'%'); }
-    });
-    await worker.setParameters({ tessedit_char_whitelist: charset(), tessedit_pageseg_mode: '7' });
-    engineReady=true; setDot('ok'); setStatus(camOn?'번호를 네모 안에 맞추고 스캔':'카메라를 켜주세요','ok');
-  }catch(e){ setDot('err'); setStatus('엔진 로드 실패: '+(e&&e.message?e.message:e),'err'); }
+    worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({ tessedit_char_whitelist:'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-' });
+    ready=true; $('dot').className='dot ok';
+  }catch(e){ $('dot').className='dot err'; }
 }
 
-async function startCam(){
+// ---------- 카메라 ----------
+async function openCam(){
+  $('cam').classList.add('on');
+  $('msg').textContent = ready ? '번호를 네모 안에 맞추고 "스캔"' : '인식 엔진 준비 중…';
   try{
     stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
-    $('video').srcObject=stream; await $('video').play(); camOn=true;
-    $('startBtn').classList.add('hide'); $('scanBtn').classList.remove('hide');
-    setStatus(engineReady?'번호를 네모 안에 맞추고 스캔':'엔진 준비 중… 잠시만', engineReady?'ok':'');
-  }catch(e){ setStatus('카메라를 못 열었어요 ('+(e&&e.name?e.name:e)+'). 아래 "사진으로"를 쓰세요.','err'); }
+    $('video').srcObject=stream; await $('video').play();
+  }catch(e){ $('msg').textContent='카메라를 못 열었어요 ('+(e.name||e)+')'; }
 }
-function camTap(){ if(camOn && !autoTimer) scanOnce(); }
+function closeCam(){ $('cam').classList.remove('on'); if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
 
-function grabFrame(){
+function grab(){
   const v=$('video'), vw=v.videoWidth, vh=v.videoHeight; if(!vw||!vh) return null;
-  const bx=.07*vw, bw=.86*vw, by=.37*vh, bh=.26*vh, sc=3;
+  const bx=.08*vw, bw=.84*vw, by=.44*vh, bh=.12*vh, sc=3;
   const c=document.createElement('canvas'); c.width=bw*sc; c.height=bh*sc;
   c.getContext('2d').drawImage(v, bx,by,bw,bh, 0,0, c.width,c.height); return c;
 }
-
 async function scanOnce(){
-  if(!engineReady){ setStatus('인식 엔진 준비 중이에요. 초록 점 뜨면 다시.','err'); return; }
-  const f=grabFrame(); if(!f){ setStatus('카메라 준비 중… 잠깐 뒤 다시','err'); return; }
-  setStatus('인식 중…');
-  try{ const {data}=await worker.recognize(f); handleText(data.text); }
-  catch(e){ setStatus('인식 오류: '+(e&&e.message?e.message:e),'err'); }
+  if(!ready){ $('msg').textContent='엔진이 아직 준비 중이에요. 잠시 뒤 다시.'; return; }
+  const f=grab(); if(!f){ $('msg').textContent='카메라 준비 중…'; return; }
+  $('msg').textContent='인식 중…';
+  try{
+    const { data } = await worker.recognize(f);
+    const hit=pick(data.text);
+    if(hit){ $('code').value=hit; render(); closeCam(); }
+    else $('msg').textContent='못 읽었어요. 더 가까이·또렷하게 다시. 안 되면 닫고 직접 입력하세요.';
+  }catch(e){ $('msg').textContent='인식 오류. 닫고 직접 입력하세요.'; }
 }
-
-function toggleAuto(){
-  if(!camOn){ setStatus('먼저 카메라를 켜주세요','err'); return; }
-  if(!engineReady){ setStatus('엔진 준비 후 자동 인식 가능','err'); return; }
-  const sw=$('sw');
-  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; sw.classList.remove('on'); setStatus('번호를 네모 안에 맞추고 스캔','ok'); return; }
-  sw.classList.add('on'); lastSeen=''; setStatus('자동 인식 켜짐 — 비추기만 하세요','ok');
-  autoTimer=setInterval(async()=>{
-    const f=grabFrame(); if(!f) return; let hit='';
-    try{ const {data}=await worker.recognize(f); hit=pick(data.text); }catch(e){ return; }
-    if(hit) setStatus('보임: '+hit,'ok');
-    if(hit && hit===lastSeen){ clearInterval(autoTimer); autoTimer=null; sw.classList.remove('on'); show(hit); }
-    lastSeen=hit;
-  },1600);
-}
-
-async function scanFile(file){
-  if(!file) return;
-  if(!engineReady){ setStatus('엔진 준비 중… 초록 점 뜨면 다시','err'); return; }
-  setStatus('사진 인식 중…'); const url=URL.createObjectURL(file);
-  try{ const {data}=await worker.recognize(url); handleText(data.text); }
-  catch(e){ setStatus('인식 오류: '+(e&&e.message?e.message:e),'err'); }
-  finally{ URL.revokeObjectURL(url); }
-}
-
 function pick(text){
-  const min=Math.max(1, parseInt($('minLen').value)||1);
   const up=(text||'').toUpperCase();
-  if(mode!=='num'){
-    const seg=(up.match(/[0-9A-Z]+(?:-[0-9A-Z]+){2,}/g)||[]);
-    if(seg.length) return seg.sort((a,b)=>b.length-a.length)[0];
-  }
-  const re = mode==='num' ? /[0-9]+/g : /[0-9A-Z-]+/g;
-  const toks=(up.match(re)||[]).map(t=>t.replace(/^-+|-+$/g,'')).filter(t=>t.replace(/-/g,'').length>=min);
+  const seg=(up.match(/[0-9A-Z]+(?:-[0-9A-Z]+){1,}/g)||[]);          // 하이픈 포함 코드 우선
+  if(seg.length) return seg.sort((a,b)=>b.length-a.length)[0];
+  const toks=(up.match(/[0-9A-Z]{4,}/g)||[]);                         // 없으면 4자 이상 덩어리
   return toks.length ? toks.sort((a,b)=>b.length-a.length)[0] : '';
-}
-function handleText(text){
-  const hit=pick(text);
-  if(hit) show(hit);
-  else setStatus('번호를 못 찾았어요. 네모 안에 번호만 크게 맞춰 다시. (읽힘: '+(text||'').trim().replace(/\s+/g,' ').slice(0,30)+')','err');
-}
-function show(v){
-  $('scanView').classList.add('hide'); $('resultView').classList.remove('hide');
-  $('num').value=v; makeCodes(v); setStatus('');
-}
-function makeCodes(v){
-  if(!v) return;
-  const q=$('qr'); q.innerHTML='';
-  if(typeof QRCode!=='undefined'){ try{ new QRCode(q,{text:v,width:170,height:170,correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
-  if(typeof JsBarcode!=='undefined'){ try{ JsBarcode('#barcode', v, {format:'CODE128',displayValue:true,height:90,fontSize:18,margin:6,width:2.2}); }catch(e){} }
-}
-function copyNum(){ const v=$('num').value.trim(); if(navigator.clipboard) navigator.clipboard.writeText(v);
-  const b=event.currentTarget; const t=b.textContent; b.textContent='✓ 복사됨'; setTimeout(()=>b.textContent=t,1200); }
-function reset(){
-  $('resultView').classList.add('hide'); $('scanView').classList.remove('hide'); lastSeen='';
-  if(camOn){ try{ $('video').play(); }catch(e){} }
-  setStatus(camOn?'번호를 네모 안에 맞추고 스캔':'카메라를 켜주세요', engineReady?'ok':'');
 }
 </script>
 </body>
